@@ -167,3 +167,36 @@ func TestView_HTMLBinFS(t *testing.T) {
 		t.Error("failed 3", sanitizeHTML(res.String()))
 	}
 }
+
+type dummyI18n struct {
+}
+
+func (_ *dummyI18n) T(key string, args ...string) string {
+	r := []string{key}
+	r = append(r, args...)
+	return strings.Join(r, "")
+}
+
+func TestView_HTMLI18n(t *testing.T) {
+	n := nova.New()
+	n.Use(func(c *nova.Context) error {
+		c.Set(view.I18nContextKey, &dummyI18n{})
+		c.Next()
+		return nil
+	})
+	n.Use(view.Handler(view.Options{
+		Directory: "testdata",
+	}))
+	router.Route(n).Get("/hello").Use(func(c *nova.Context) error {
+		v := view.Extract(c)
+		v.Data["Key4"] = "DDD"
+		v.HTML("dir3/dir31")
+		return nil
+	})
+	req, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+	res := testkit.NewDummyResponse()
+	n.ServeHTTP(res, req)
+	if res.Header().Get(view.ContentType) != "text/html" || sanitizeHTML(res.String()) != "AAABBBCCCDDD" {
+		t.Error("failed 1", sanitizeHTML(res.String()))
+	}
+}
