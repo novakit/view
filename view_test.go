@@ -180,7 +180,7 @@ func (_ *dummyI18n) T(key string, args ...string) string {
 func TestView_HTMLI18n(t *testing.T) {
 	n := nova.New()
 	n.Use(func(c *nova.Context) error {
-		c.Set(view.I18nContextKey, &dummyI18n{})
+		c.Values[view.I18nContextKey] = &dummyI18n{}
 		c.Next()
 		return nil
 	})
@@ -196,7 +196,7 @@ func TestView_HTMLI18n(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 	res := testkit.NewDummyResponse()
 	n.ServeHTTP(res, req)
-	if res.Header().Get(view.ContentType) != "text/html" || sanitizeHTML(res.String()) != "AAABBBCCCDDD" {
+	if res.Header().Get(view.ContentType) != "text/html" || sanitizeHTML(res.String()) != "AAABBBCCCAAABBBCCCDDD" {
 		t.Error("failed 1", sanitizeHTML(res.String()))
 	}
 }

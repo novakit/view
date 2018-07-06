@@ -25,11 +25,11 @@ const (
 	// FileExtension filename extension of template file
 	FileExtension = ".html"
 
-	// ContextKey key of *View in request context
-	ContextKey = "nova.view"
+	// ContextKey key of View in nova.Context
+	ContextKey = "_view"
 
-	// I18nContextKey hard coded key of I18n module, avoid importing i18n package
-	I18nContextKey = "nova.i18n"
+	// I18nContextKey hard coded key of I18n in nova.Context
+	I18nContextKey = "_i18n"
 )
 
 // FuncMapPlaceholder placeholder template.FuncMap for request-local functions
@@ -54,7 +54,7 @@ type View struct {
 	// Data data in html rendering
 	Data map[string]interface{}
 
-	res http.ResponseWriter
+	ctx *nova.Context
 	tpl *template.Template
 }
 
@@ -69,7 +69,7 @@ func (v *View) TryUseI18n(c *nova.Context) {
 		return
 	}
 	// extract i18n module to package-local interface
-	if i, ok := c.Value(I18nContextKey).(i18n); ok {
+	if i, ok := c.Values[I18nContextKey].(i18n); ok {
 		v.tpl = v.tpl.Funcs(template.FuncMap{
 			"T": func(key string, args ...string) string {
 				return i.T(key, args...)
@@ -85,10 +85,19 @@ func (v *View) HTML(templateName string) {
 
 // RenderHTML render html template with custom status code
 func (v *View) RenderHTML(statusCode int, templateName string) {
-	if len(v.res.Header().Get(ContentType)) == 0 {
-		v.res.Header().Set(ContentType, "text/html")
+	if len(v.ctx.Res.Header().Get(ContentType)) == 0 {
+		v.ctx.Res.Header().Set(ContentType, "text/html")
 	}
-	if err := v.tpl.ExecuteTemplate(v.res, templateName, v.Data); err != nil {
+	// create merged data
+	data := make(map[string]interface{})
+	for k, v := range v.ctx.Values {
+		data[k] = v
+	}
+	for k, v := range v.Data {
+		data[k] = v
+	}
+	// render template with specified name
+	if err := v.tpl.ExecuteTemplate(v.ctx.Res, templateName, data); err != nil {
 		panic(err)
 	}
 }
@@ -105,12 +114,12 @@ func (v *View) RenderJSON(statusCode int, obj interface{}) {
 	if p, err = json.Marshal(obj); err != nil {
 		panic(err)
 	}
-	if len(v.res.Header().Get(ContentType)) == 0 {
-		v.res.Header().Set(ContentType, "application/json")
+	if len(v.ctx.Res.Header().Get(ContentType)) == 0 {
+		v.ctx.Res.Header().Set(ContentType, "application/json")
 	}
-	v.res.Header().Set(ContentLength, strconv.Itoa(len(p)))
-	v.res.WriteHeader(statusCode)
-	v.res.Write(p)
+	v.ctx.Res.Header().Set(ContentLength, strconv.Itoa(len(p)))
+	v.ctx.Res.WriteHeader(statusCode)
+	v.ctx.Res.Write(p)
 }
 
 // Text write plain text with status code 200
@@ -120,12 +129,12 @@ func (v *View) Text(t string) {
 
 // RenderText with plain text with custom status code
 func (v *View) RenderText(statusCode int, t string) {
-	if len(v.res.Header().Get(ContentType)) == 0 {
-		v.res.Header().Set(ContentType, "text/plain")
+	if len(v.ctx.Res.Header().Get(ContentType)) == 0 {
+		v.ctx.Res.Header().Set(ContentType, "text/plain")
 	}
-	v.res.Header().Set(ContentLength, strconv.Itoa(len(t)))
-	v.res.WriteHeader(statusCode)
-	v.res.Write([]byte(t))
+	v.ctx.Res.Header().Set(ContentLength, strconv.Itoa(len(t)))
+	v.ctx.Res.WriteHeader(statusCode)
+	v.ctx.Res.Write([]byte(t))
 }
 
 // Binary write bytes with status code 200
@@ -135,12 +144,12 @@ func (v *View) Binary(p []byte) {
 
 // RenderBinary write bytes with custom status code
 func (v *View) RenderBinary(statusCode int, p []byte) {
-	if len(v.res.Header().Get(ContentType)) == 0 {
-		v.res.Header().Set(ContentType, "application/octet-stream")
+	if len(v.ctx.Res.Header().Get(ContentType)) == 0 {
+		v.ctx.Res.Header().Set(ContentType, "application/octet-stream")
 	}
-	v.res.Header().Set(ContentLength, strconv.Itoa(len(p)))
-	v.res.WriteHeader(statusCode)
-	v.res.Write(p)
+	v.ctx.Res.Header().Set(ContentLength, strconv.Itoa(len(p)))
+	v.ctx.Res.WriteHeader(statusCode)
+	v.ctx.Res.Write(p)
 }
 
 func sanitizeOptions(opts ...Options) (opt Options) {
@@ -249,11 +258,11 @@ func Handler(opts ...Options) nova.HandlerFunc {
 			tpl = LoadTemplate(opt)
 		}
 		// build view
-		v := &View{Data: map[string]interface{}{}, res: c.Res, tpl: tpl}
+		v := &View{Data: map[string]interface{}{}, ctx: c, tpl: tpl}
 		// try use request-local i18n instance
 		v.TryUseI18n(c)
 		// inject
-		c.Set(ContextKey, v)
+		c.Values[ContextKey] = v
 		// invoke next
 		c.Next()
 		return nil
@@ -262,6 +271,6 @@ func Handler(opts ...Options) nova.HandlerFunc {
 
 // Extract extract View from nova.Context
 func Extract(c *nova.Context) (v *View) {
-	v, _ = c.Value(ContextKey).(*View)
+	v, _ = c.Values[ContextKey].(*View)
 	return
 }
