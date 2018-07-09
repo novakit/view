@@ -173,7 +173,7 @@ func LoadTemplate(opt Options) *template.Template {
 		var n *binfs.Node
 		n = binfs.Find(strings.Split(opt.Directory, "/")...)
 		if n == nil {
-			panic(fmt.Errorf("cann't find directory " + opt.Directory + " from binfs"))
+			return nil
 		}
 		fs = n.FileSystem()
 	} else {
@@ -181,7 +181,7 @@ func LoadTemplate(opt Options) *template.Template {
 	}
 	// walk filesystem and update template
 	if err = walkTemplateFiles(fs, "", tpl); err != nil {
-		panic(err)
+		return nil
 	}
 	return tpl
 }
