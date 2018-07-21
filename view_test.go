@@ -67,8 +67,22 @@ func TestView_JSON(t *testing.T) {
 		v.JSON(map[string]string{"A": "B"})
 		return nil
 	})
+	router.Route(n).Get("/hello2").Use(func(c *nova.Context) error {
+		v := view.Extract(c)
+		v.Data["A"] = "B"
+		v.DataAsJSON()
+		return nil
+	})
+
 	req, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 	res := testkit.NewDummyResponse()
+	n.ServeHTTP(res, req)
+	if res.Header().Get(view.ContentType) != "application/json" || res.String() != `{"A":"B"}` {
+		t.Error("failed")
+	}
+
+	req, _ = http.NewRequest(http.MethodGet, "/hello2", nil)
+	res = testkit.NewDummyResponse()
 	n.ServeHTTP(res, req)
 	if res.Header().Get(view.ContentType) != "application/json" || res.String() != `{"A":"B"}` {
 		t.Error("failed")

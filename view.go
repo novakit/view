@@ -102,6 +102,16 @@ func (v *View) RenderHTML(statusCode int, templateName string) {
 	}
 }
 
+// DataAsJSON short-hand for v.JSON(v.Data)
+func (v *View) DataAsJSON() {
+	v.JSON(v.Data)
+}
+
+// RenderDataAsJSON short-hand for v.RenderJSON(statusCode, v.Data)
+func (v *View) RenderDataAsJSON(statusCode int) {
+	v.RenderJSON(statusCode, v.Data)
+}
+
 // JSON marshal object as JSON format with code 200
 func (v *View) JSON(obj interface{}) {
 	v.RenderJSON(http.StatusOK, obj)
